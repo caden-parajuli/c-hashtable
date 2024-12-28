@@ -2,19 +2,17 @@
  * Author: Caden Parajuli - caden.parajuli@bc.edu
  */
 
-/*
- * Implemented as a dynamically-sized hashtable with size a power of 2
- * using Robin Hood linear probing, backward shift deletion, and a FNV1-a hash
- */
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "hash_table.h"
 
+#define FNV_PRIME_64 0x100000001B3
+#define FNV_BASIS_64 0xCBF29CE484222325
+
+/** Hash function for use in the hash table */
 static uint64_t fnv_hash_64(const char * key) {
-    /** Hash function for the symbol table */
     uint64_t hash = FNV_BASIS_64;
     for (const uint8_t * curr_loc = (const uint8_t *)key; *curr_loc; curr_loc++) {
         hash ^= *curr_loc;
@@ -23,13 +21,15 @@ static uint64_t fnv_hash_64(const char * key) {
     return hash;
 }
 
+/** Creates a new symbol table.
+ *  Returns NULL upon failure */
 HashTable * new_hash_table(size_t capacity) {
-    /** Creates a new symbol table */
     /* Round capacity up to power of 2 */
     size_t new_cap = (size_t)(1ULL << (63 - __builtin_clzll((uint64_t)capacity)));
     if (new_cap != capacity) {
         capacity = new_cap << 1;
     }
+
     /* Allocate table space */
     HashTable * table = malloc(sizeof(HashTable));
     if (table == NULL) {
@@ -47,8 +47,8 @@ HashTable * new_hash_table(size_t capacity) {
     return table;
 }
 
+/** Frees a hash table and all of its keys */
 void free_hash_table(HashTable * table) {
-    /** Frees a symbol table */
     /* Free entries and keys */
     for (size_t index = 0; index < table->capacity; index++) {
         if (table->entries[index] != NULL) {
@@ -61,8 +61,9 @@ void free_hash_table(HashTable * table) {
     free(table);
 }
 
+/** Gets symbol from symbol table.
+ *  Returns NULL if key is not in table */
 void * get_entry(HashTable * table, const char * key) {
-    /** Gets symbol from symbol table. Returns NULL if key is not in table */
     uint64_t hash = fnv_hash_64(key);
     size_t index = hash & (table->capacity - 1);
     size_t psl = 0;
@@ -82,10 +83,9 @@ void * get_entry(HashTable * table, const char * key) {
     return NULL;
 }
 
+/** Internal function for setting symbol value.
+ *  Returns 1 if the value was already present, 0 if it was added */
 static int set_entry_helper(TableEntry ** entries, TableEntry * entry, size_t capacity) {
-    /** Internal function for setting symbol value.
-     *  Returns 1 if value was already present, 0 if value was added
-     */
     /* Loop until there's an empty entry */
     size_t index = entry->hash & (uint64_t)(capacity - 1);
     while (entries[index] != NULL) {
@@ -97,7 +97,7 @@ static int set_entry_helper(TableEntry ** entries, TableEntry * entry, size_t ca
         }
         else if (strcmp(entry->key, entries[index]->key) == 0) {
             /* Key found */
-            /* entries[index]->value = entry->value; */ /* Used to update value */
+            entries[index]->value = entry->value; /* Used to update value */
             return 1;
         }
         /* Index is taken, probe */
@@ -109,10 +109,9 @@ static int set_entry_helper(TableEntry ** entries, TableEntry * entry, size_t ca
     return 0;
 }
 
+/** Sets entry value.
+ *  Returns 1 if value was already present, and 0 if it was added */
 int set_entry(HashTable * table, const char * key, void * value) {
-    /** Sets symbol value.
-     *  Returns 1 if value was already present, 0 if value was added
-     */
     TableEntry * entry = malloc(sizeof(TableEntry));
     if (entry == NULL) {
         return 1;
@@ -138,8 +137,9 @@ int set_entry(HashTable * table, const char * key, void * value) {
     return ret;
 }
 
+/** Expands a table. 
+ *  Returns non-zero upon failure */
 int expand_hash_table(HashTable * table) {
-    /** Expands a table. Returns non-zero on failure */
     TableEntry ** new_entries = calloc(2 * table->capacity, sizeof(TableEntry));
     if (new_entries == NULL) {
         return 1;
@@ -158,8 +158,9 @@ int expand_hash_table(HashTable * table) {
     return 0;
 }
 
+/** Remove a mapping from a hash table. 
+ *  Returns 1 if the entry is not present in the table */
 int unset_entry(HashTable * table, const char * key) {
-    /** Remove a symbol from the symbol table. Returns 1 if entry is not present in table */
     size_t index = fnv_hash_64(key) & (table->capacity - 1);
 
     /* Probe for entry */
@@ -183,12 +184,14 @@ int unset_entry(HashTable * table, const char * key) {
     free((void *)table->entries[index]->key);
     free(table->entries[index]);
     index = (index + 1) & (table->capacity - 1);
+
     /* Backward shift */
     while (table->entries[index] != NULL && table->entries[index]->psl != 0) {
         table->entries[index]->psl -= 1;
         table->entries[index ? (index - 1) : (table->capacity - 1)] = table->entries[index];
         index = (index + 1) & (table->capacity - 1);
     }
+
     table->entries[index ? (index - 1) : (table->capacity - 1)] = NULL;
     return 0;
 }
