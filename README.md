@@ -1,9 +1,7 @@
-# c-hashtable
+# C-hashtable
+
+A string-key hashtable implemented in C. This was originally created for use in the symbol table of a compiler, but can be used for any purpose.
 
 ## Implementation Details
 
-This hashtable uses an FNV-1a hash, Robinhood linear probing, and backward shifting deletion.
-
-## Note
-
-This repository was lifted from a defunct compiler project. If there are oddities with the structure or commit history, this is probably the reason
+The hashtable uses an FNV-1a hash, Robin Hood linear probing, and backward shifting deletion.
